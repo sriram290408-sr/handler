@@ -1,6 +1,5 @@
 from contextlib import asynccontextmanager
 
-from routers import auth, student
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -8,7 +7,7 @@ from config import settings
 from core.security import hash_password
 from database import Base, SessionLocal, engine
 from models.user import User
-from routers import dashboard
+from routers import auth, student, dashboard
 
 
 def seed_default_admin() -> None:
@@ -30,17 +29,26 @@ def seed_default_admin() -> None:
 
 
 @asynccontextmanager
-async def lifespan(_app: FastAPI):
+async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
     seed_default_admin()
     yield
 
 
-app = FastAPI(title="Student Management API")
+app = FastAPI(
+    title="Student Management API",
+    lifespan=lifespan
+)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:5173", "http://127.0.0.1:5173", "https://handler-mc78.vercel.app"],
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ],
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
