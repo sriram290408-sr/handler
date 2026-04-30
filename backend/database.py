@@ -3,8 +3,18 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 
 from config import settings
 
-engine = create_engine(settings.database_url)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+engine = create_engine(
+    settings.database_url,
+    pool_pre_ping=True,
+    pool_recycle=300,
+)
+
+SessionLocal = sessionmaker(
+    autocommit=False,
+    autoflush=False,
+    bind=engine
+)
+
 Base = declarative_base()
 
 

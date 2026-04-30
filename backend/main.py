@@ -1,5 +1,3 @@
-from contextlib import asynccontextmanager
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -9,13 +7,13 @@ from database import Base, SessionLocal, engine
 from models.user import User
 from routers import auth, student, dashboard
 
-
 def seed_default_admin() -> None:
     db = SessionLocal()
     try:
         user = db.query(User).filter(User.email == settings.admin_email).first()
         if user:
             return
+
         db_user = User(
             username=settings.admin_username,
             email=settings.admin_email,
@@ -24,21 +22,27 @@ def seed_default_admin() -> None:
         )
         db.add(db_user)
         db.commit()
+    except Exception as e:
+        print("Seed error:", e)
     finally:
         db.close()
 
+app = FastAPI(title="Student Management API")
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    Base.metadata.create_all(bind=engine)
-    seed_default_admin()
-    yield
+@app.on_event("startup")
+def startup():
+    try:
+        print("Starting app...")
+        Base.metadata.create_all(bind=engine)
 
+        # Seed admin
+        seed_default_admin()
 
-app = FastAPI(
-    title="Student Management API",
-    lifespan=lifespan
-)
+        print("Startup completed")
+
+    except Exception as e:
+        print("Startup error:", str(e))
+
 
 app.add_middleware(
     CORSMiddleware,
