@@ -68,11 +68,6 @@ export default function Dashboard() {
             </ResponsiveContainer>
           </div>
         </div>
-        <div className="rounded-xl bg-white p-4 shadow md:col-span-3">
-          <h4 className="mb-2 text-sm text-gray-500">Quick Navigation</h4>
-          <p className="text-gray-900">Use Students to add/manage records</p>
-          <p className="text-gray-900">Use filters to narrow results quickly</p>
-        </div>
       </div>
     </div>
   );

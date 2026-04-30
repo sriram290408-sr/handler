@@ -36,12 +36,12 @@ export default function Sidebar({ username, onLogout }) {
         </NavLink>
       </nav>
       <NavLink
-        to="/personaldetails"
+        to="/attendence"
         className={({ isActive }) =>
           `${baseClass} ${isActive} ? activeClass : ""}`
         }
       >
-        Personal Details
+        Attendence
       </NavLink>
 
       <button
