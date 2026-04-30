@@ -11,12 +11,35 @@ router = APIRouter(prefix="/auth", tags=["Auth"])
 
 @router.post("/login", response_model=TokenResponse)
 def login(payload: LoginRequest, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.email == payload.email).first()
-    if user is None or not verify_password(payload.password, user.hashed_password):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email or password",
+    try:
+        user = db.query(User).filter(User.email == payload.email).first()
+
+        if user is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid email or password",
+            )
+
+        if not verify_password(payload.password, user.hashed_password):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid email or password",
+            )
+
+        token = create_access_token(subject=user.email)
+
+        return TokenResponse(
+            access_token=token,
+            username=user.username,
+            email=user.email,
         )
 
-    token = create_access_token(subject=user.email)
-    return TokenResponse(access_token=token, username=user.username, email=user.email)
+    except HTTPException:
+        raise
+
+    except Exception as e:
+        print("LOGIN ERROR:", str(e))
+        raise HTTPException(
+            status_code=500,
+            detail="Internal Server Error"
+        )

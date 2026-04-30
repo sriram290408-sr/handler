@@ -3,11 +3,12 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from config import settings
 from core.security import hash_password
-from database import Base, SessionLocal, engine
+from database import SessionLocal
 from models.user import User
 from routers import auth, student, dashboard
 
-def seed_default_admin() -> None:
+
+def seed_default_admin():
     db = SessionLocal()
     try:
         user = db.query(User).filter(User.email == settings.admin_email).first()
@@ -27,22 +28,15 @@ def seed_default_admin() -> None:
     finally:
         db.close()
 
+
 app = FastAPI(title="Student Management API")
 
-@app.on_event("startup")
 def startup():
     try:
-        print("Starting app...")
-        Base.metadata.create_all(bind=engine)
-
-        # Seed admin
+        print("App starting...")
         seed_default_admin()
-
-        print("Startup completed")
-
     except Exception as e:
-        print("Startup error:", str(e))
-
+        print("Startup error:", e)
 
 app.add_middleware(
     CORSMiddleware,
