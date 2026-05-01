@@ -1,6 +1,5 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
-// 🔒 Ensure env is defined
 if (!API_BASE_URL) {
   throw new Error("VITE_API_BASE_URL is not defined");
 }
@@ -19,7 +18,7 @@ async function request(endpoint, options = {}) {
     ...(options.headers || {}),
   };
 
-  // 🔐 Attach token safely
+  // ✅ Attach token
   if (token) {
     headers.Authorization = `Bearer ${token}`;
   }
@@ -59,19 +58,40 @@ async function request(endpoint, options = {}) {
   return data;
 }
 
-export function login(email, password) {
-  return request("/auth/login", {
+//
+// 🔐 AUTH
+//
+
+export async function login(email, password) {
+  const data = await request("/auth/login", {
     method: "POST",
     body: JSON.stringify({ email, password }),
   });
+
+  // 🔥 CRITICAL FIX — STORE TOKEN
+  if (data?.access_token) {
+    localStorage.setItem("token", data.access_token);
+  } else {
+    throw new Error("No access token received");
+  }
+
+  return data;
 }
 
+export function logout() {
+  localStorage.removeItem("token");
+}
+
+//
 // 📊 Dashboard
+//
 export function getDashboard() {
   return request("/dashboard/stats");
 }
 
+//
 // 👨‍🎓 Students
+//
 export function getStudents({
   page = 1,
   limit = 10,
