@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom";
-import logo from "/logo.png";
+import logo from "../assets/handler.png";
 
 export default function Sidebar({ username, onLogout }) {
   const baseClass =
