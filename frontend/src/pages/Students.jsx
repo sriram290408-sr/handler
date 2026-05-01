@@ -38,6 +38,11 @@ export default function Students() {
   const [editingStudent, setEditingStudent] = useState(null);
   const [editForm, setEditForm] = useState(initialForm);
   const [editLoading, setEditLoading] = useState(false);
+  const [viewingStudent, setViewingStudent] = useState(null);
+  const [replaceSearchValue, setReplaceSearchValue] = useState("");
+  const [replaceWithValue, setReplaceWithValue] = useState("");
+  const [replaceLoading, setReplaceLoading] = useState(false);
+  const [replaceReport, setReplaceReport] = useState("");
 
   const loadStudents = async () => {
     setLoading(true);
@@ -184,6 +189,109 @@ export default function Students() {
     }
   };
 
+  const getAllStudents = async () => {
+    let currentPage = 1;
+    let totalPages = 1;
+    const allStudents = [];
+
+    while (currentPage <= totalPages) {
+      const response = await getStudents({
+        page: currentPage,
+        limit: 100,
+        search: "",
+        standard: "",
+        bloodGroup: "",
+      });
+      allStudents.push(...response.data);
+      totalPages = response.total_pages;
+      currentPage += 1;
+    }
+
+    return allStudents;
+  };
+
+  const replaceInStudent = (student, searchValue, replacementValue) => {
+    const fields = [
+      "name",
+      "standard",
+      "age",
+      "blood_group",
+      "email",
+      "father_name",
+      "father_occupation",
+      "mother_name",
+      "mother_occupation",
+      "school_name",
+      "address",
+      "phone_number",
+    ];
+
+    const updates = {};
+    let changed = false;
+
+    for (const field of fields) {
+      const value = student[field];
+      if (value === null || value === undefined) continue;
+
+      if (typeof value === "number") {
+        if (String(value) === searchValue) {
+          const replacementNumber = Number(replacementValue);
+          if (!Number.isNaN(replacementNumber)) {
+            updates[field] = replacementNumber;
+            changed = true;
+          }
+        }
+        continue;
+      }
+
+      const stringValue = String(value);
+      if (stringValue.includes(searchValue)) {
+        updates[field] = stringValue.split(searchValue).join(replacementValue);
+        changed = true;
+      }
+    }
+
+    return changed ? updates : null;
+  };
+
+  const handleReplaceAll = async () => {
+    if (!replaceSearchValue.trim()) {
+      setError("Search value is required for replace.");
+      return;
+    }
+
+    setReplaceLoading(true);
+    setReplaceReport("");
+    setError("");
+
+    try {
+      const allStudents = await getAllStudents();
+      let updatedCount = 0;
+      let skippedCount = 0;
+
+      for (const student of allStudents) {
+        const updates = replaceInStudent(student, replaceSearchValue, replaceWithValue);
+        if (!updates) {
+          skippedCount += 1;
+          continue;
+        }
+        try {
+          await patchStudent(student.id, updates);
+          updatedCount += 1;
+        } catch (_err) {
+          skippedCount += 1;
+        }
+      }
+
+      setReplaceReport(`Updated ${updatedCount} student record(s). Skipped ${skippedCount}.`);
+      await loadStudents();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setReplaceLoading(false);
+    }
+  };
+
   const openEditModal = (student) => {
     setEditingStudent(student);
     setEditForm({
@@ -290,6 +398,39 @@ export default function Students() {
             </select>
           </div>
         </div>
+        <div className="mt-6">
+        <h4 className="mb-3 text-lg font-semibold text-gray-900">Search & Replace</h4>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Search Value</label>
+            <input
+              value={replaceSearchValue}
+              onChange={(e) => setReplaceSearchValue(e.target.value)}
+              className="w-full rounded border border-gray-300 px-2 py-2 focus:ring-2 focus:ring-indigo-400"
+              placeholder="Text or number"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Replace With</label>
+            <input
+              value={replaceWithValue}
+              onChange={(e) => setReplaceWithValue(e.target.value)}
+              className="w-full rounded border border-gray-300 px-2 py-2 focus:ring-2 focus:ring-indigo-400"
+              placeholder="Text or number"
+            />
+          </div>
+          <div className="flex items-end">
+            <button
+              onClick={handleReplaceAll}
+              disabled={replaceLoading}
+              className="w-full rounded bg-purple-600 px-4 py-2 text-white hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-70"
+            >
+              {replaceLoading ? "Replacing..." : "Replace All Matches"}
+            </button>
+          </div>
+        </div>
+        {replaceReport && <p className="mt-2 text-sm text-green-600">{replaceReport}</p>}
+        </div>
       </div>
 
       {loading ? (
@@ -319,6 +460,9 @@ export default function Students() {
                     <td className="border-b border-gray-200 px-3 py-2">{student.phone_number}</td>
                     <td className="border-b border-gray-200 px-3 py-2">
                       <div className="flex gap-2">
+                        <button onClick={() => setViewingStudent(student)} className="rounded bg-gray-600 px-3 py-1 text-sm text-white hover:bg-gray-700">
+                          View
+                        </button>
                         <button onClick={() => openEditModal(student)} className="rounded bg-indigo-600 px-3 py-1 text-sm text-white hover:bg-indigo-700">
                           Edit
                         </button>
@@ -356,6 +500,34 @@ export default function Students() {
             </button>
           </div>
           {students.length === 0 && <p className="mt-3 text-sm text-gray-500">No students found.</p>}
+        </div>
+      )}
+
+      {viewingStudent && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4">
+          <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-xl bg-white p-4 shadow-xl">
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-900">Student Details</h3>
+              <button onClick={() => setViewingStudent(null)} className="text-sm text-gray-500 hover:text-gray-700">
+                Close
+              </button>
+            </div>
+            <div className="grid grid-cols-1 gap-2 text-sm md:grid-cols-2">
+              <p><span className="font-medium">ID:</span> {viewingStudent.id}</p>
+              <p><span className="font-medium">Name:</span> {viewingStudent.name}</p>
+              <p><span className="font-medium">Standard:</span> {viewingStudent.standard}</p>
+              <p><span className="font-medium">Age:</span> {viewingStudent.age}</p>
+              <p><span className="font-medium">Blood Group:</span> {viewingStudent.blood_group}</p>
+              <p><span className="font-medium">Email:</span> {viewingStudent.email}</p>
+              <p><span className="font-medium">Father Name:</span> {viewingStudent.father_name}</p>
+              <p><span className="font-medium">Father Occupation:</span> {viewingStudent.father_occupation}</p>
+              <p><span className="font-medium">Mother Name:</span> {viewingStudent.mother_name}</p>
+              <p><span className="font-medium">Mother Occupation:</span> {viewingStudent.mother_occupation}</p>
+              <p><span className="font-medium">School Name:</span> {viewingStudent.school_name}</p>
+              <p><span className="font-medium">Address:</span> {viewingStudent.address}</p>
+              <p><span className="font-medium">Phone Number:</span> {viewingStudent.phone_number}</p>
+            </div>
+          </div>
         </div>
       )}
 
