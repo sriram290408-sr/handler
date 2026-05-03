@@ -18,7 +18,6 @@ async function request(endpoint, options = {}) {
     ...(options.headers || {}),
   };
 
-  // ✅ Attach token
   if (token) {
     headers.Authorization = `Bearer ${token}`;
   }
@@ -50,17 +49,15 @@ async function request(endpoint, options = {}) {
   if (!response.ok) {
     throw new Error(
       data?.detail ||
-      data?.message ||
-      `Request failed with status ${response.status}`
+        data?.message ||
+        `Request failed with status ${response.status}`,
     );
   }
 
   return data;
 }
 
-//
 // 🔐 AUTH
-//
 
 export async function login(email, password) {
   const data = await request("/auth/login", {
@@ -68,7 +65,6 @@ export async function login(email, password) {
     body: JSON.stringify({ email, password }),
   });
 
-  // 🔥 CRITICAL FIX — STORE TOKEN
   if (data?.access_token) {
     localStorage.setItem("token", data.access_token);
   } else {
@@ -82,22 +78,21 @@ export function logout() {
   localStorage.removeItem("token");
 }
 
-//
 // 📊 Dashboard
-//
+
 export function getDashboard() {
   return request("/dashboard/stats");
 }
 
-//
 // 👨‍🎓 Students
-//
+
 export function getStudents({
   page = 1,
   limit = 10,
   search = "",
   standard = "",
   bloodGroup = "",
+  community = "", // ✅ was missing
 } = {}) {
   const query = new URLSearchParams();
 
@@ -107,6 +102,7 @@ export function getStudents({
   if (search) query.set("search", search);
   if (standard) query.set("standard", standard);
   if (bloodGroup) query.set("blood_group", bloodGroup);
+  if (community) query.set("community", community); // ✅ was missing
 
   return request(`/students?${query.toString()}`);
 }

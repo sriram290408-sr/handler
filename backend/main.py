@@ -3,8 +3,9 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from config import settings
 from core.security import hash_password
-from database import SessionLocal
+from database import Base, SessionLocal, engine
 from models.user import User
+from models.student import Student  # ✅ must import so SQLAlchemy registers the table
 from routers import auth, student, dashboard
 
 
@@ -31,12 +32,14 @@ def seed_default_admin():
 
 app = FastAPI(title="Student Management API")
 
+
+@app.on_event("startup")
 def startup():
-    try:
-        print("App starting...")
-        seed_default_admin()
-    except Exception as e:
-        print("Startup error:", e)
+    print("App starting...")
+    # ✅ Create all tables before seeding
+    Base.metadata.create_all(bind=engine)
+    seed_default_admin()
+
 
 app.add_middleware(
     CORSMiddleware,

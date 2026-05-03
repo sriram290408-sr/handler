@@ -1,22 +1,84 @@
 import { useEffect, useState } from "react";
 import Papa from "papaparse";
-import { createStudent, deleteStudent, getStudents, patchStudent } from "../services/api";
+import {
+  createStudent,
+  deleteStudent,
+  getStudents,
+  patchStudent,
+} from "../services/api";
 
 const bloodGroups = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
+const communities = ["BC", "OC", "MBC", "SC/ST"];
 
 const initialForm = {
   name: "",
-  standard: "",
-  age: "",
-  blood_group: "",
-  email: "",
   father_name: "",
-  father_occupation: "",
-  mother_name: "",
-  mother_occupation: "",
+  gender: "",
+  standard: "",
+  medium: "",
   school_name: "",
+  dob: "",
+  community: "",
+  blood_group: "",
   address: "",
-  phone_number: "",
+  parent_phone_number: "",
+  parents_occupation: "",
+};
+
+const normalizePhoneNumber = (value) => {
+  if (value === null || value === undefined) return "";
+
+  let phone = String(value).trim().replace(/\s+/g, "");
+
+  if (phone.endsWith(".0")) {
+    phone = phone.slice(0, -2);
+  }
+
+  if (/e/i.test(phone)) {
+    const numericPhone = Number(phone);
+    if (!Number.isNaN(numericPhone)) {
+      phone = numericPhone.toFixed(0);
+    }
+  }
+
+  phone = phone.replace(/[^\d+]/g, "");
+
+  if (phone.startsWith("+91")) {
+    phone = phone.slice(3);
+  } else if (phone.startsWith("91") && phone.length === 12) {
+    phone = phone.slice(2);
+  }
+
+  return phone;
+};
+
+const formatDate = (isoString) => {
+  if (!isoString) return "-";
+  const d = new Date(isoString);
+  if (isNaN(d)) return "-";
+  return d.toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+};
+
+const normalizeHeader = (header) =>
+  header.trim().toLowerCase().replace(/[\s\-\/\\]+/g, "_");
+
+const CSV_HEADER_MAP = {
+  name: "name",
+  father_name: "father_name",
+  gender: "gender",
+  class: "standard",
+  medium: "medium",
+  school: "school_name",
+  dob: "dob",
+  community: "community",
+  blood_group: "blood_group",
+  address: "address",
+  mb_parents: "parent_phone_number",
+  parents_occupation: "parents_occupation",
 };
 
 export default function Students() {
@@ -26,6 +88,7 @@ export default function Students() {
   const [search, setSearch] = useState("");
   const [standard, setStandard] = useState("");
   const [bloodGroup, setBloodGroup] = useState("");
+  const [community, setCommunity] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [form, setForm] = useState(initialForm);
@@ -48,7 +111,14 @@ export default function Students() {
     setLoading(true);
     setError("");
     try {
-      const data = await getStudents({ page, limit: 10, search, standard, bloodGroup });
+      const data = await getStudents({
+        page,
+        limit: 10,
+        search,
+        standard,
+        bloodGroup,
+        community,
+      });
       setStudents(data.data);
       setMeta({ total: data.total, total_pages: data.total_pages });
     } catch (err) {
@@ -60,7 +130,7 @@ export default function Students() {
 
   useEffect(() => {
     loadStudents();
-  }, [page, search, standard, bloodGroup]);
+  }, [page, search, standard, bloodGroup, community]);
 
   const handleCreate = async (e) => {
     e.preventDefault();
@@ -70,7 +140,7 @@ export default function Students() {
       await createStudent({
         ...form,
         standard: Number(form.standard),
-        age: Number(form.age),
+        parent_phone_number: normalizePhoneNumber(form.parent_phone_number),
       });
       setForm(initialForm);
       setShowAddModal(false);
@@ -84,33 +154,55 @@ export default function Students() {
   };
 
   const normalizeRow = (row) => {
-    const student = {
-      name: String(row.name ?? row.Name ?? "").trim(),
-      standard: Number(row.standard ?? row.Standard ?? ""),
-      age: Number(row.age ?? row.Age ?? ""),
-      blood_group: String(row.blood_group ?? row.BloodGroup ?? row["blood group"] ?? "").trim(),
-      email: String(row.email ?? row.Email ?? "").trim(),
-      father_name: String(row.father_name ?? row.FatherName ?? row["father name"] ?? "").trim(),
-      father_occupation: String(row.father_occupation ?? row.FatherOccupation ?? row["father occupation"] ?? "").trim(),
-      mother_name: String(row.mother_name ?? row.MotherName ?? row["mother name"] ?? "").trim(),
-      mother_occupation: String(row.mother_occupation ?? row.MotherOccupation ?? row["mother occupation"] ?? "").trim(),
-      school_name: String(row.school_name ?? row.SchoolName ?? row["school name"] ?? "").trim(),
-      address: String(row.address ?? row.Address ?? "").trim(),
-      phone_number: String(row.phone_number ?? row.PhoneNumber ?? row["phone number"] ?? "").trim(),
+    const mapped = {};
+    for (const [rawKey, value] of Object.entries(row)) {
+      const normalizedKey = normalizeHeader(rawKey);
+      const fieldName = CSV_HEADER_MAP[normalizedKey];
+      if (fieldName) {
+        mapped[fieldName] = value;
+      }
+    }
+    return {
+      name: String(mapped.name ?? "").trim(),
+      father_name: String(mapped.father_name ?? "").trim(),
+      gender: String(mapped.gender ?? "").trim(),
+      standard: Number(mapped.standard ?? ""),
+      medium: String(mapped.medium ?? "").trim(),
+      school_name: String(mapped.school_name ?? "").trim(),
+      dob: String(mapped.dob ?? "").trim(),
+      community: String(mapped.community ?? "").trim(),
+      blood_group: String(mapped.blood_group ?? "").trim(),
+      address: String(mapped.address ?? "").trim(),
+      parent_phone_number: normalizePhoneNumber(
+        mapped.parent_phone_number ?? "",
+      ),
+      parents_occupation: String(mapped.parents_occupation ?? "").trim(),
     };
-    return student;
   };
 
   const validateStudent = (student) => {
     if (!student.name) return "Name is required";
-    if (!Number.isInteger(student.standard) || student.standard < 6 || student.standard > 12) return "Standard must be between 6 and 12";
-    if (!Number.isInteger(student.age) || student.age < 3 || student.age > 30) return "Age must be between 3 and 30";
-    if (!bloodGroups.includes(student.blood_group)) return "Blood group is invalid";
-    if (!student.email) return "Email is required";
-    if (!student.father_name || !student.father_occupation || !student.mother_name || !student.mother_occupation || !student.school_name || !student.address) {
-      return "Parent names, occupations, school and address fields are required";
-    }
-    if (student.phone_number.length < 7 || student.phone_number.length > 15) return "Phone number length must be 7-15";
+    if (
+      !Number.isInteger(student.standard) ||
+      student.standard < 6 ||
+      student.standard > 12
+    )
+      return "Standard (CLASS) must be between 6 and 12";
+    if (!student.gender) return "Gender is required";
+    if (!student.medium) return "Medium is required";
+    if (!student.school_name) return "School is required";
+    if (!student.dob) return "DOB is required";
+    if (!student.community) return "Community is required";
+    if (!bloodGroups.includes(student.blood_group))
+      return "Blood group is invalid";
+    if (!student.address) return "Address is required";
+    if (!student.parents_occupation) return "Parents occupation is required";
+    if (!student.father_name) return "Father name is required";
+
+    const phone = normalizePhoneNumber(student.parent_phone_number);
+    if (!/^[6-9]\d{9}$/.test(phone))
+      return "MB-PARENTS must be a valid 10-digit Indian number starting with 6, 7, 8, or 9";
+
     return "";
   };
 
@@ -134,10 +226,8 @@ export default function Students() {
       });
 
       const rows = parseResult.data || [];
+      if (rows.length === 0) throw new Error("Uploaded file is empty");
 
-      if (rows.length === 0) {
-        throw new Error("Uploaded file is empty");
-      }
       setCsvPreviewRows(rows.slice(0, 3));
 
       let successCount = 0;
@@ -150,7 +240,6 @@ export default function Students() {
           failedRows.push(`Row ${i + 2}: ${validationError}`);
           continue;
         }
-
         try {
           await createStudent(normalized);
           successCount += 1;
@@ -159,11 +248,7 @@ export default function Students() {
         }
       }
 
-      setUploadReport({
-        total: rows.length,
-        successCount,
-        failedRows,
-      });
+      setUploadReport({ total: rows.length, successCount, failedRows });
       setPage(1);
       await loadStudents();
     } catch (err) {
@@ -175,8 +260,7 @@ export default function Students() {
   };
 
   const handleDelete = async (id) => {
-    const shouldDelete = window.confirm("Delete this student?");
-    if (!shouldDelete) return;
+    if (!window.confirm("Delete this student?")) return;
     setDeleteLoadingId(id);
     setError("");
     try {
@@ -193,7 +277,6 @@ export default function Students() {
     let currentPage = 1;
     let totalPages = 1;
     const allStudents = [];
-
     while (currentPage <= totalPages) {
       const response = await getStudents({
         page: currentPage,
@@ -201,38 +284,36 @@ export default function Students() {
         search: "",
         standard: "",
         bloodGroup: "",
+        community: "",
       });
       allStudents.push(...response.data);
       totalPages = response.total_pages;
       currentPage += 1;
     }
-
     return allStudents;
   };
 
   const replaceInStudent = (student, searchValue, replacementValue) => {
     const fields = [
       "name",
-      "standard",
-      "age",
-      "blood_group",
-      "email",
       "father_name",
-      "father_occupation",
-      "mother_name",
-      "mother_occupation",
+      "gender",
+      "standard",
+      "medium",
       "school_name",
+      "dob",
+      "community",
+      "blood_group",
       "address",
-      "phone_number",
+      "parent_phone_number",
+      "parents_occupation",
     ];
-
     const updates = {};
     let changed = false;
 
     for (const field of fields) {
       const value = student[field];
       if (value === null || value === undefined) continue;
-
       if (typeof value === "number") {
         if (String(value) === searchValue) {
           const replacementNumber = Number(replacementValue);
@@ -243,7 +324,6 @@ export default function Students() {
         }
         continue;
       }
-
       const stringValue = String(value);
       if (stringValue.includes(searchValue)) {
         updates[field] = stringValue.split(searchValue).join(replacementValue);
@@ -259,18 +339,19 @@ export default function Students() {
       setError("Search value is required for replace.");
       return;
     }
-
     setReplaceLoading(true);
     setReplaceReport("");
     setError("");
-
     try {
       const allStudents = await getAllStudents();
       let updatedCount = 0;
       let skippedCount = 0;
-
       for (const student of allStudents) {
-        const updates = replaceInStudent(student, replaceSearchValue, replaceWithValue);
+        const updates = replaceInStudent(
+          student,
+          replaceSearchValue,
+          replaceWithValue,
+        );
         if (!updates) {
           skippedCount += 1;
           continue;
@@ -282,8 +363,9 @@ export default function Students() {
           skippedCount += 1;
         }
       }
-
-      setReplaceReport(`Updated ${updatedCount} student record(s). Skipped ${skippedCount}.`);
+      setReplaceReport(
+        `Updated ${updatedCount} student record(s). Skipped ${skippedCount}.`,
+      );
       await loadStudents();
     } catch (err) {
       setError(err.message);
@@ -296,17 +378,17 @@ export default function Students() {
     setEditingStudent(student);
     setEditForm({
       name: student.name || "",
-      standard: student.standard || "",
-      age: student.age || "",
-      blood_group: student.blood_group || "",
-      email: student.email || "",
       father_name: student.father_name || "",
-      father_occupation: student.father_occupation || "",
-      mother_name: student.mother_name || "",
-      mother_occupation: student.mother_occupation || "",
+      gender: student.gender || "",
+      standard: student.standard || "",
+      medium: student.medium || "",
       school_name: student.school_name || "",
+      dob: student.dob || "",
+      community: student.community || "",
+      blood_group: student.blood_group || "",
       address: student.address || "",
-      phone_number: student.phone_number || "",
+      parent_phone_number: student.parent_phone_number || "",
+      parents_occupation: student.parents_occupation || "",
     });
   };
 
@@ -319,7 +401,7 @@ export default function Students() {
       await patchStudent(editingStudent.id, {
         ...editForm,
         standard: Number(editForm.standard),
-        age: Number(editForm.age),
+        parent_phone_number: normalizePhoneNumber(editForm.parent_phone_number),
       });
       setEditingStudent(null);
       await loadStudents();
@@ -330,27 +412,155 @@ export default function Students() {
     }
   };
 
+  const renderFormFields = (formData, setFormData) => (
+    <div className="mb-3 grid grid-cols-1 gap-3 md:grid-cols-3">
+      {[
+        { label: "Name", key: "name", placeholder: "Enter name" },
+        {
+          label: "Father Name",
+          key: "father_name",
+          placeholder: "Enter father name",
+        },
+        {
+          label: "Standard (Class)",
+          key: "standard",
+          type: "number",
+          placeholder: "6–12",
+          min: 6,
+          max: 12,
+        },
+        {
+          label: "Medium",
+          key: "medium",
+          placeholder: "e.g. Tamil / English",
+        },
+        {
+          label: "School Name",
+          key: "school_name",
+          placeholder: "Enter school name",
+        },
+        { label: "DOB", key: "dob", placeholder: "e.g. 01/01/2010" },
+        { label: "Address", key: "address", placeholder: "Enter address" },
+        {
+          label: "Parent Phone (MB-PARENTS)",
+          key: "parent_phone_number",
+          placeholder: "10-digit Indian number",
+        },
+        {
+          label: "Parents Occupation",
+          key: "parents_occupation",
+          placeholder: "Enter occupation",
+        },
+      ].map(({ label, key, type = "text", placeholder, min, max }) => (
+        <div key={key}>
+          <label className="mb-1 block text-sm font-medium text-gray-700">
+            {label}
+          </label>
+          <input
+            type={type}
+            min={min}
+            max={max}
+            placeholder={placeholder}
+            value={formData[key]}
+            onChange={(e) =>
+              setFormData({ ...formData, [key]: e.target.value })
+            }
+            className="w-full rounded border border-gray-300 px-2 py-2 focus:ring-2 focus:ring-indigo-400"
+            required
+          />
+        </div>
+      ))}
+      {/* Gender dropdown */}
+      <div>
+        <label className="mb-1 block text-sm font-medium text-gray-700">
+          Gender
+        </label>
+        <select
+          value={formData.gender}
+          onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
+          className="w-full rounded border border-gray-300 px-2 py-2 focus:ring-2 focus:ring-indigo-400"
+          required
+        >
+          <option value="">Select</option>
+          <option value="Male">Male</option>
+          <option value="Female">Female</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+      {/* Community dropdown */}
+      <div>
+        <label className="mb-1 block text-sm font-medium text-gray-700">
+          Community
+        </label>
+        <select
+          value={formData.community}
+          onChange={(e) =>
+            setFormData({ ...formData, community: e.target.value })
+          }
+          className="w-full rounded border border-gray-300 px-2 py-2 focus:ring-2 focus:ring-indigo-400"
+          required
+        >
+          <option value="">Select</option>
+          {communities.map((c) => (
+            <option key={c} value={c}>
+              {c}
+            </option>
+          ))}
+        </select>
+      </div>
+      {/* Blood Group dropdown */}
+      <div>
+        <label className="mb-1 block text-sm font-medium text-gray-700">
+          Blood Group
+        </label>
+        <select
+          value={formData.blood_group}
+          onChange={(e) =>
+            setFormData({ ...formData, blood_group: e.target.value })
+          }
+          className="w-full rounded border border-gray-300 px-2 py-2 focus:ring-2 focus:ring-indigo-400"
+          required
+        >
+          <option value="">Select</option>
+          {bloodGroups.map((bg) => (
+            <option key={bg} value={bg}>
+              {bg}
+            </option>
+          ))}
+        </select>
+      </div>
+    </div>
+  );
+
   return (
     <div>
+      {/* Header */}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-2xl font-semibold text-gray-900">Students</h2>
-        <div className="flex gap-2">
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="rounded bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700"
-          >
-            Add Student
-          </button>
-        </div>
+        <button
+          onClick={() => setShowAddModal(true)}
+          className="rounded bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700"
+        >
+          Add Student
+        </button>
       </div>
+
       <p className="mb-4 text-sm text-gray-500">
-        Active filters: {search || "No name search"}, Standard {standard || "All"}, Blood Group {bloodGroup || "All"}
+        Active filters: {search || "No name search"}, Standard{" "}
+        {standard || "All"}, Blood Group {bloodGroup || "All"}, Community{" "}
+        {community || "All"}
       </p>
+
+      {/* Search & Filter */}
       <div className="mb-4 rounded-xl bg-white p-4 shadow">
-        <h4 className="mb-3 text-lg font-semibold text-gray-900">Search & Filter</h4>
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+        <h4 className="mb-3 text-lg font-semibold text-gray-900">
+          Search & Filter
+        </h4>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Search by Name</label>
+            <label className="mb-1 block text-sm font-medium text-gray-700">
+              Search by Name
+            </label>
             <input
               value={search}
               onChange={(e) => {
@@ -362,7 +572,9 @@ export default function Students() {
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Standard</label>
+            <label className="mb-1 block text-sm font-medium text-gray-700">
+              Standard
+            </label>
             <select
               value={standard}
               onChange={(e) => {
@@ -380,7 +592,9 @@ export default function Students() {
             </select>
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Blood Group</label>
+            <label className="mb-1 block text-sm font-medium text-gray-700">
+              Blood Group
+            </label>
             <select
               value={bloodGroup}
               onChange={(e) => {
@@ -397,42 +611,73 @@ export default function Students() {
               ))}
             </select>
           </div>
-        </div>
-        <div className="mt-6">
-        <h4 className="mb-3 text-lg font-semibold text-gray-900">Search & Replace</h4>
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Search Value</label>
-            <input
-              value={replaceSearchValue}
-              onChange={(e) => setReplaceSearchValue(e.target.value)}
+            <label className="mb-1 block text-sm font-medium text-gray-700">
+              Community
+            </label>
+            <select
+              value={community}
+              onChange={(e) => {
+                setCommunity(e.target.value);
+                setPage(1);
+              }}
               className="w-full rounded border border-gray-300 px-2 py-2 focus:ring-2 focus:ring-indigo-400"
-              placeholder="Text or number"
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Replace With</label>
-            <input
-              value={replaceWithValue}
-              onChange={(e) => setReplaceWithValue(e.target.value)}
-              className="w-full rounded border border-gray-300 px-2 py-2 focus:ring-2 focus:ring-indigo-400"
-              placeholder="Text or number"
-            />
-          </div>
-          <div className="flex items-end">
-            <button
-              onClick={handleReplaceAll}
-              disabled={replaceLoading}
-              className="w-full rounded bg-purple-600 px-4 py-2 text-white hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-70"
             >
-              {replaceLoading ? "Replacing..." : "Replace All Matches"}
-            </button>
+              <option value="">All Communities</option>
+              {communities.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
-        {replaceReport && <p className="mt-2 text-sm text-green-600">{replaceReport}</p>}
+
+        {/* Search & Replace */}
+        <div className="mt-6">
+          <h4 className="mb-3 text-lg font-semibold text-gray-900">
+            Search & Replace
+          </h4>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">
+                Search Value
+              </label>
+              <input
+                value={replaceSearchValue}
+                onChange={(e) => setReplaceSearchValue(e.target.value)}
+                className="w-full rounded border border-gray-300 px-2 py-2 focus:ring-2 focus:ring-indigo-400"
+                placeholder="Text or number"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">
+                Replace With
+              </label>
+              <input
+                value={replaceWithValue}
+                onChange={(e) => setReplaceWithValue(e.target.value)}
+                className="w-full rounded border border-gray-300 px-2 py-2 focus:ring-2 focus:ring-indigo-400"
+                placeholder="Text or number"
+              />
+            </div>
+            <div className="flex items-end">
+              <button
+                onClick={handleReplaceAll}
+                disabled={replaceLoading}
+                className="w-full rounded bg-purple-600 px-4 py-2 text-white hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {replaceLoading ? "Replacing..." : "Replace All Matches"}
+              </button>
+            </div>
+          </div>
+          {replaceReport && (
+            <p className="mt-2 text-sm text-green-600">{replaceReport}</p>
+          )}
         </div>
       </div>
 
+      {/* Table */}
       {loading ? (
         <p className="text-gray-500">Loading students...</p>
       ) : (
@@ -442,28 +687,73 @@ export default function Students() {
             <table className="w-full border border-gray-200">
               <thead className="bg-gray-100">
                 <tr>
-                  <th className="border-b border-gray-200 px-3 py-2 text-left text-sm text-gray-900">ID</th>
-                  <th className="border-b border-gray-200 px-3 py-2 text-left text-sm text-gray-900">Name</th>
-                  <th className="border-b border-gray-200 px-3 py-2 text-left text-sm text-gray-900">Standard</th>
-                  <th className="border-b border-gray-200 px-3 py-2 text-left text-sm text-gray-900">Blood Group</th>
-                  <th className="border-b border-gray-200 px-3 py-2 text-left text-sm text-gray-900">Phone</th>
-                  <th className="border-b border-gray-200 px-3 py-2 text-left text-sm text-gray-900">Actions</th>
+                  {[
+                    "ID",
+                    "Name",
+                    "Father Name",
+                    "Gender",
+                    "Standard",
+                    "Medium",
+                    "Community",
+                    "Blood Group",
+                    "Phone",
+                    "Created Date",
+                    "Actions",
+                  ].map((h) => (
+                    <th
+                      key={h}
+                      className="border-b border-gray-200 px-3 py-2 text-left text-sm text-gray-900"
+                    >
+                      {h}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
                 {students.map((student) => (
                   <tr key={student.id} className="hover:bg-gray-50">
-                    <td className="border-b border-gray-200 px-3 py-2">{student.id}</td>
-                    <td className="border-b border-gray-200 px-3 py-2">{student.name}</td>
-                    <td className="border-b border-gray-200 px-3 py-2">{student.standard}</td>
-                    <td className="border-b border-gray-200 px-3 py-2">{student.blood_group}</td>
-                    <td className="border-b border-gray-200 px-3 py-2">{student.phone_number}</td>
+                    <td className="border-b border-gray-200 px-3 py-2">
+                      {student.id}
+                    </td>
+                    <td className="border-b border-gray-200 px-3 py-2">
+                      {student.name}
+                    </td>
+                    <td className="border-b border-gray-200 px-3 py-2">
+                      {student.father_name}
+                    </td>
+                    <td className="border-b border-gray-200 px-3 py-2">
+                      {student.gender}
+                    </td>
+                    <td className="border-b border-gray-200 px-3 py-2">
+                      {student.standard}
+                    </td>
+                    <td className="border-b border-gray-200 px-3 py-2">
+                      {student.medium}
+                    </td>
+                    <td className="border-b border-gray-200 px-3 py-2">
+                      {student.community}
+                    </td>
+                    <td className="border-b border-gray-200 px-3 py-2">
+                      {student.blood_group}
+                    </td>
+                    <td className="border-b border-gray-200 px-3 py-2">
+                      {student.parent_phone_number}
+                    </td>
+                    <td className="border-b border-gray-200 px-3 py-2">
+                      {formatDate(student.created_at)}
+                    </td>
                     <td className="border-b border-gray-200 px-3 py-2">
                       <div className="flex gap-2">
-                        <button onClick={() => setViewingStudent(student)} className="rounded bg-gray-600 px-3 py-1 text-sm text-white hover:bg-gray-700">
+                        <button
+                          onClick={() => setViewingStudent(student)}
+                          className="rounded bg-gray-600 px-3 py-1 text-sm text-white hover:bg-gray-700"
+                        >
                           View
                         </button>
-                        <button onClick={() => openEditModal(student)} className="rounded bg-indigo-600 px-3 py-1 text-sm text-white hover:bg-indigo-700">
+                        <button
+                          onClick={() => openEditModal(student)}
+                          className="rounded bg-indigo-600 px-3 py-1 text-sm text-white hover:bg-indigo-700"
+                        >
                           Edit
                         </button>
                         <button
@@ -471,7 +761,9 @@ export default function Students() {
                           disabled={deleteLoadingId === student.id}
                           className="rounded bg-red-500 px-3 py-1 text-sm text-white hover:bg-red-600 disabled:opacity-70"
                         >
-                          {deleteLoadingId === student.id ? "Deleting..." : "Delete"}
+                          {deleteLoadingId === student.id
+                            ? "Deleting..."
+                            : "Delete"}
                         </button>
                       </div>
                     </td>
@@ -480,6 +772,7 @@ export default function Students() {
               </tbody>
             </table>
           </div>
+
           <div className="mt-3 flex items-center justify-between">
             <button
               disabled={page <= 1}
@@ -499,111 +792,82 @@ export default function Students() {
               Next
             </button>
           </div>
-          {students.length === 0 && <p className="mt-3 text-sm text-gray-500">No students found.</p>}
+          {students.length === 0 && (
+            <p className="mt-3 text-sm text-gray-500">No students found.</p>
+          )}
         </div>
       )}
 
+      {/* View Modal */}
       {viewingStudent && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4">
           <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-xl bg-white p-4 shadow-xl">
             <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-gray-900">Student Details</h3>
-              <button onClick={() => setViewingStudent(null)} className="text-sm text-gray-500 hover:text-gray-700">
+              <h3 className="text-lg font-semibold text-gray-900">
+                Student Details
+              </h3>
+              <button
+                onClick={() => setViewingStudent(null)}
+                className="text-sm text-gray-500 hover:text-gray-700"
+              >
                 Close
               </button>
             </div>
             <div className="grid grid-cols-1 gap-2 text-sm md:grid-cols-2">
-              <p><span className="font-medium">ID:</span> {viewingStudent.id}</p>
-              <p><span className="font-medium">Name:</span> {viewingStudent.name}</p>
-              <p><span className="font-medium">Standard:</span> {viewingStudent.standard}</p>
-              <p><span className="font-medium">Age:</span> {viewingStudent.age}</p>
-              <p><span className="font-medium">Blood Group:</span> {viewingStudent.blood_group}</p>
-              <p><span className="font-medium">Email:</span> {viewingStudent.email}</p>
-              <p><span className="font-medium">Father Name:</span> {viewingStudent.father_name}</p>
-              <p><span className="font-medium">Father Occupation:</span> {viewingStudent.father_occupation}</p>
-              <p><span className="font-medium">Mother Name:</span> {viewingStudent.mother_name}</p>
-              <p><span className="font-medium">Mother Occupation:</span> {viewingStudent.mother_occupation}</p>
-              <p><span className="font-medium">School Name:</span> {viewingStudent.school_name}</p>
-              <p><span className="font-medium">Address:</span> {viewingStudent.address}</p>
-              <p><span className="font-medium">Phone Number:</span> {viewingStudent.phone_number}</p>
+              {[
+                ["ID", viewingStudent.id],
+                ["Name", viewingStudent.name],
+                ["Father Name", viewingStudent.father_name],
+                ["Gender", viewingStudent.gender],
+                ["Standard", viewingStudent.standard],
+                ["Medium", viewingStudent.medium],
+                ["School Name", viewingStudent.school_name],
+                ["DOB", viewingStudent.dob],
+                ["Community", viewingStudent.community],
+                ["Blood Group", viewingStudent.blood_group],
+                ["Address", viewingStudent.address],
+                ["Parent Phone", viewingStudent.parent_phone_number],
+                ["Parents Occupation", viewingStudent.parents_occupation],
+                ["Created Date", formatDate(viewingStudent.created_at)],
+              ].map(([label, value]) => (
+                <p key={label}>
+                  <span className="font-medium">{label}:</span> {value}
+                </p>
+              ))}
             </div>
           </div>
         </div>
       )}
 
+      {/* Edit Modal */}
       {editingStudent && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4">
           <div className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-xl bg-white p-4 shadow-xl">
             <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-gray-900">Edit Student</h3>
-              <button onClick={() => setEditingStudent(null)} className="text-sm text-gray-500 hover:text-gray-700">
+              <h3 className="text-lg font-semibold text-gray-900">
+                Edit Student
+              </h3>
+              <button
+                onClick={() => setEditingStudent(null)}
+                className="text-sm text-gray-500 hover:text-gray-700"
+              >
                 Cancel
               </button>
             </div>
-
             <form onSubmit={handleEditSave}>
-              <div className="mb-3 grid grid-cols-1 gap-3 md:grid-cols-3">
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">Name</label>
-                  <input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} className="w-full rounded border border-gray-300 px-2 py-2 focus:ring-2 focus:ring-indigo-400" required />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">Standard</label>
-                  <input type="number" min="6" max="12" value={editForm.standard} onChange={(e) => setEditForm({ ...editForm, standard: e.target.value })} className="w-full rounded border border-gray-300 px-2 py-2 focus:ring-2 focus:ring-indigo-400" required />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">Age</label>
-                  <input type="number" min="3" max="30" value={editForm.age} onChange={(e) => setEditForm({ ...editForm, age: e.target.value })} className="w-full rounded border border-gray-300 px-2 py-2 focus:ring-2 focus:ring-indigo-400" required />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">Blood Group</label>
-                  <select value={editForm.blood_group} onChange={(e) => setEditForm({ ...editForm, blood_group: e.target.value })} className="w-full rounded border border-gray-300 px-2 py-2 focus:ring-2 focus:ring-indigo-400" required>
-                    <option value="">Select</option>
-                    {bloodGroups.map((bg) => (
-                      <option key={bg} value={bg}>
-                        {bg}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">Email</label>
-                  <input type="email" value={editForm.email} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} className="w-full rounded border border-gray-300 px-2 py-2 focus:ring-2 focus:ring-indigo-400" required />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">Father Name</label>
-                  <input value={editForm.father_name} onChange={(e) => setEditForm({ ...editForm, father_name: e.target.value })} className="w-full rounded border border-gray-300 px-2 py-2 focus:ring-2 focus:ring-indigo-400" required />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">Father Occupation</label>
-                  <input value={editForm.father_occupation} onChange={(e) => setEditForm({ ...editForm, father_occupation: e.target.value })} className="w-full rounded border border-gray-300 px-2 py-2 focus:ring-2 focus:ring-indigo-400" required />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">Mother Name</label>
-                  <input value={editForm.mother_name} onChange={(e) => setEditForm({ ...editForm, mother_name: e.target.value })} className="w-full rounded border border-gray-300 px-2 py-2 focus:ring-2 focus:ring-indigo-400" required />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">Mother Occupation</label>
-                  <input value={editForm.mother_occupation} onChange={(e) => setEditForm({ ...editForm, mother_occupation: e.target.value })} className="w-full rounded border border-gray-300 px-2 py-2 focus:ring-2 focus:ring-indigo-400" required />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">School Name</label>
-                  <input value={editForm.school_name} onChange={(e) => setEditForm({ ...editForm, school_name: e.target.value })} className="w-full rounded border border-gray-300 px-2 py-2 focus:ring-2 focus:ring-indigo-400" required />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">Address</label>
-                  <input value={editForm.address} onChange={(e) => setEditForm({ ...editForm, address: e.target.value })} className="w-full rounded border border-gray-300 px-2 py-2 focus:ring-2 focus:ring-indigo-400" required />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">Phone Number</label>
-                  <input value={editForm.phone_number} onChange={(e) => setEditForm({ ...editForm, phone_number: e.target.value })} className="w-full rounded border border-gray-300 px-2 py-2 focus:ring-2 focus:ring-indigo-400" required />
-                </div>
-              </div>
+              {renderFormFields(editForm, setEditForm)}
               <div className="flex gap-2">
-                <button disabled={editLoading} className="rounded bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700 disabled:opacity-70">
+                <button
+                  disabled={editLoading}
+                  className="rounded bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700 disabled:opacity-70"
+                >
                   {editLoading ? "Saving..." : "Save Changes"}
                 </button>
-                <button type="button" onClick={() => setEditingStudent(null)} className="rounded border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-100">
+                <button
+                  type="button"
+                  onClick={() => setEditingStudent(null)}
+                  className="rounded border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-100"
+                >
                   Cancel
                 </button>
               </div>
@@ -612,74 +876,23 @@ export default function Students() {
         </div>
       )}
 
+      {/* Add Modal */}
       {showAddModal && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4">
           <div className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-xl bg-white p-4 shadow-xl">
             <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-gray-900">Add Student</h3>
-              <button onClick={() => setShowAddModal(false)} className="text-sm text-gray-500 hover:text-gray-700">
+              <h3 className="text-lg font-semibold text-gray-900">
+                Add Student
+              </h3>
+              <button
+                onClick={() => setShowAddModal(false)}
+                className="text-sm text-gray-500 hover:text-gray-700"
+              >
                 Close
               </button>
             </div>
-
             <form onSubmit={handleCreate}>
-              <div className="mb-3 grid grid-cols-1 gap-3 md:grid-cols-3">
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">Name</label>
-                  <input placeholder="Enter name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full rounded border border-gray-300 px-2 py-2 focus:ring-2 focus:ring-indigo-400" required />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">Standard</label>
-                  <input type="number" min="6" max="12" placeholder="6-12" value={form.standard} onChange={(e) => setForm({ ...form, standard: e.target.value })} className="w-full rounded border border-gray-300 px-2 py-2 focus:ring-2 focus:ring-indigo-400" required />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">Age</label>
-                  <input type="number" min="3" max="30" placeholder="Enter age" value={form.age} onChange={(e) => setForm({ ...form, age: e.target.value })} className="w-full rounded border border-gray-300 px-2 py-2 focus:ring-2 focus:ring-indigo-400" required />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">Blood Group</label>
-                  <select value={form.blood_group} onChange={(e) => setForm({ ...form, blood_group: e.target.value })} className="w-full rounded border border-gray-300 px-2 py-2 focus:ring-2 focus:ring-indigo-400" required>
-                    <option value="">Select</option>
-                    {bloodGroups.map((bg) => (
-                      <option key={bg} value={bg}>
-                        {bg}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">Father Name</label>
-                  <input placeholder="Enter father name" value={form.father_name} onChange={(e) => setForm({ ...form, father_name: e.target.value })} className="w-full rounded border border-gray-300 px-2 py-2 focus:ring-2 focus:ring-indigo-400" required />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">Father Occupation</label>
-                  <input placeholder="Enter father occupation" value={form.father_occupation} onChange={(e) => setForm({ ...form, father_occupation: e.target.value })} className="w-full rounded border border-gray-300 px-2 py-2 focus:ring-2 focus:ring-indigo-400" required />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">Mother Name</label>
-                  <input placeholder="Enter mother name" value={form.mother_name} onChange={(e) => setForm({ ...form, mother_name: e.target.value })} className="w-full rounded border border-gray-300 px-2 py-2 focus:ring-2 focus:ring-indigo-400" required />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">Mother Occupation</label>
-                  <input placeholder="Enter mother occupation" value={form.mother_occupation} onChange={(e) => setForm({ ...form, mother_occupation: e.target.value })} className="w-full rounded border border-gray-300 px-2 py-2 focus:ring-2 focus:ring-indigo-400" required />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">Email</label>
-                  <input type="email" placeholder="Enter email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="w-full rounded border border-gray-300 px-2 py-2 focus:ring-2 focus:ring-indigo-400" required />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">School Name</label>
-                  <input placeholder="Enter school name" value={form.school_name} onChange={(e) => setForm({ ...form, school_name: e.target.value })} className="w-full rounded border border-gray-300 px-2 py-2 focus:ring-2 focus:ring-indigo-400" required />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">Address</label>
-                  <input placeholder="Enter address" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} className="w-full rounded border border-gray-300 px-2 py-2 focus:ring-2 focus:ring-indigo-400" required />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">Phone Number</label>
-                  <input placeholder="Enter phone number" value={form.phone_number} onChange={(e) => setForm({ ...form, phone_number: e.target.value })} className="w-full rounded border border-gray-300 px-2 py-2 focus:ring-2 focus:ring-indigo-400" required />
-                </div>
-              </div>
+              {renderFormFields(form, setForm)}
               <button
                 disabled={createLoading}
                 className="rounded bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-70"
@@ -688,26 +901,40 @@ export default function Students() {
               </button>
             </form>
 
+            {/* Bulk Upload */}
             <div className="mt-5 rounded-lg border border-gray-200 p-3">
-              <h4 className="text-sm font-semibold text-gray-900">Bulk Upload (CSV)</h4>
+              <h4 className="text-sm font-semibold text-gray-900">
+                Bulk Upload (CSV)
+              </h4>
               <p className="mt-1 text-xs text-gray-500">
-                Required columns: name, standard, age, blood_group, email, father_name, father_occupation, mother_name, mother_occupation, school_name, address, phone_number
+                Required columns: NAME, FATHER NAME, GENDER, CLASS, MEDIUM,
+                SCHOOL, DOB, COMMUNITY, BLOOD GROUP, ADDRESS, MB-PARENTS,
+                PARENTS OCCUPATION
               </p>
               <label className="mt-3 inline-block cursor-pointer rounded bg-purple-500 px-4 py-2 text-sm text-white hover:bg-purple-600">
                 {uploadLoading ? "Uploading..." : "Bulk Upload"}
-                <input type="file" accept=".csv" className="hidden" onChange={handleBulkUpload} disabled={uploadLoading} />
+                <input
+                  type="file"
+                  accept=".csv"
+                  className="hidden"
+                  onChange={handleBulkUpload}
+                  disabled={uploadLoading}
+                />
               </label>
-
               {csvPreviewRows.length > 0 && (
                 <div className="mt-3 rounded bg-gray-50 p-2 text-xs text-gray-700">
                   <p className="mb-1 font-medium">Preview (first 3 rows):</p>
-                  <pre className="max-h-28 overflow-y-auto whitespace-pre-wrap">{JSON.stringify(csvPreviewRows, null, 2)}</pre>
+                  <pre className="max-h-28 overflow-y-auto whitespace-pre-wrap">
+                    {JSON.stringify(csvPreviewRows, null, 2)}
+                  </pre>
                 </div>
               )}
             </div>
           </div>
         </div>
       )}
+
+      {/* Upload Report */}
       {uploadReport && (
         <div className="mt-3 rounded-lg border border-gray-200 bg-white p-3 text-sm">
           <p className="text-green-600">Success: {uploadReport.successCount}</p>
@@ -722,6 +949,7 @@ export default function Students() {
           )}
         </div>
       )}
+
       {error && <p className="mt-3 text-sm text-red-500">{error}</p>}
     </div>
   );

@@ -1,12 +1,19 @@
 from math import ceil
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from core.dependencies import get_current_user
 from database import get_db
 from models.student import Student
-from schemas.student import BloodGroupEnum, StudentCreate, StudentListResponse, StudentPatch, StudentResponse
+from schemas.student import (
+    BloodGroupEnum,
+    StudentCreate,
+    StudentListResponse,
+    StudentPatch,
+    StudentResponse,
+)
 
 router = APIRouter(prefix="/students", tags=["Students"])
 
@@ -17,10 +24,14 @@ def create_student(
     db: Session = Depends(get_db),
     _current_user=Depends(get_current_user),
 ):
-    student = Student(**payload.model_dump())
+    student = Student(**payload.model_dump(exclude_none=True))
     db.add(student)
-    db.commit()
-    db.refresh(student)
+    try:
+        db.commit()
+        db.refresh(student)
+    except Exception:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to create student")
     return student
 
 
@@ -31,21 +42,37 @@ def list_students(
     search: str | None = Query(default=None),
     standard: int | None = Query(default=None, ge=6, le=12),
     blood_group: BloodGroupEnum | None = Query(default=None),
+    community: str | None = Query(default=None),
     db: Session = Depends(get_db),
     _current_user=Depends(get_current_user),
 ):
     query = db.query(Student)
+
     if search:
         query = query.filter(Student.name.ilike(f"%{search}%"))
     if standard is not None:
         query = query.filter(Student.standard == standard)
     if blood_group is not None:
         query = query.filter(Student.blood_group == blood_group.value)
+    if community is not None:
+        query = query.filter(func.lower(Student.community) == community.lower())  # ✅ exact match, not ilike
 
     total = query.count()
     total_pages = ceil(total / limit) if total > 0 else 1
-    students = query.order_by(Student.id.desc()).offset((page - 1) * limit).limit(limit).all()
-    return StudentListResponse(data=students, total=total, page=page, total_pages=total_pages)
+
+    students = (
+        query.order_by(Student.id.asc())
+        .offset((page - 1) * limit)
+        .limit(limit)
+        .all()
+    )
+
+    return StudentListResponse(
+        data=students,
+        total=total,
+        page=page,
+        total_pages=total_pages,
+    )
 
 
 @router.get("/{student_id}", response_model=StudentResponse)
@@ -92,5 +119,6 @@ def delete_student(
     student = db.query(Student).filter(Student.id == student_id).first()
     if not student:
         raise HTTPException(status_code=404, detail="Student not found")
+
     db.delete(student)
     db.commit()
