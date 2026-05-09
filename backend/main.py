@@ -5,8 +5,9 @@ from config import settings
 from core.security import hash_password
 from database import Base, SessionLocal, engine
 from models.user import User
-from models.student import Student  # ✅ must import so SQLAlchemy registers the table
-from routers import auth, student, dashboard
+from models.student import Student       
+from models.attendence import Attendance  
+from routers import auth, student, dashboard, attendence
 
 
 def seed_default_admin():
@@ -36,8 +37,7 @@ app = FastAPI(title="Student Management API")
 @app.on_event("startup")
 def startup():
     print("App starting...")
-    # ✅ Create all tables before seeding
-    Base.metadata.create_all(bind=engine)
+    Base.metadata.create_all(bind=engine)   # creates all tables
     seed_default_admin()
 
 
@@ -58,6 +58,7 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(student.router)
 app.include_router(dashboard.router)
+app.include_router(attendence.router)
 
 
 @app.get("/")
