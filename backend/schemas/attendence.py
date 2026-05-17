@@ -1,23 +1,28 @@
-from datetime import date, datetime
-from pydantic import BaseModel, ConfigDict
+from datetime import date
+from typing import Literal
+
+from pydantic import BaseModel
 
 
-class AttendanceRecord(BaseModel):
+AttendanceStatus = Literal["present", "absent", "leave"]
+
+
+class AttendanceRecordSave(BaseModel):
     student_id: int
-    status: str  # "present" or "absent"
+    status: AttendanceStatus
 
 
 class AttendanceBulkSave(BaseModel):
     date: date
-    records: list[AttendanceRecord]
+    records: list[AttendanceRecordSave]
 
 
 class StudentAttendanceStatus(BaseModel):
     student_id: int
     name: str
-    father_name: str
+    father_name: str | None = None
     standard: int
-    status: str
+    status: AttendanceStatus
 
 
 class DailyAttendanceResponse(BaseModel):
@@ -26,9 +31,10 @@ class DailyAttendanceResponse(BaseModel):
     total: int
     present: int
     absent: int
+    leave: int = 0
 
 
-class MonthlyBreakdownItem(BaseModel):
+class MonthlyBreakdown(BaseModel):
     month: str
     year: int
     total_days: int
@@ -39,29 +45,36 @@ class MonthlyBreakdownItem(BaseModel):
 class StudentAnalysisResponse(BaseModel):
     student_id: int
     name: str
-    father_name: str
+    father_name: str | None = None
     standard: int
-    medium: str
-    school_name: str
+    medium: str | None = None
+    school_name: str | None = None
     total_session_days: int
     days_present: int
     days_absent: int
+    days_leave: int = 0
     overall_percentage: float
     highest_month: str
     lowest_month: str
-    monthly_breakdown: list[MonthlyBreakdownItem]
+    monthly_breakdown: list[MonthlyBreakdown]
 
 
-class AttendanceSummary(BaseModel):
+class DashboardTodayStats(BaseModel):
     date: date
     total: int
     present: int
     absent: int
+    leave: int = 0
+    percentage: float
+
+
+class DashboardMonthlyTrend(BaseModel):
+    month: str
     percentage: float
 
 
 class DashboardAttendanceStats(BaseModel):
-    today: AttendanceSummary
-    monthly_trend: list[dict]
+    today: DashboardTodayStats
+    monthly_trend: list[DashboardMonthlyTrend]
     avg_attendance: float
     total_enrollment: int

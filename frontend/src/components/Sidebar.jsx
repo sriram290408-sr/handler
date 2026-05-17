@@ -19,15 +19,9 @@ export default function Sidebar({ username }) {
   return (
     <aside className="fixed left-0 top-0 flex h-screen w-[220px] flex-col border-r border-gray-200 bg-white p-5">
       <div className="mb-6 flex items-center gap-3">
-        <img
-          src={logo}
-          alt="Logo"
-          className="h-10 w-10 object-contain"
-        />
+        <img src={logo} alt="Logo" className="h-10 w-10 object-contain" />
 
-        <h2 className="text-lg font-semibold text-gray-900">
-          Handler
-        </h2>
+        <h2 className="text-lg font-semibold text-gray-900">Handler</h2>
       </div>
 
       <p className="mb-4 rounded bg-gray-100 px-3 py-2 text-sm text-gray-700">
@@ -51,6 +45,15 @@ export default function Sidebar({ username }) {
           }
         >
           Students
+        </NavLink>
+
+        <NavLink
+          to="/teachers"
+          className={({ isActive }) =>
+            `${baseClass} ${isActive ? activeClass : ""}`
+          }
+        >
+          Teachers
         </NavLink>
 
         <NavLink

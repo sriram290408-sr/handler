@@ -1,277 +1,244 @@
-import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  Users,
-  Activity,
-  BarChart3,
   GraduationCap,
   ArrowRight,
   CheckCircle2,
+  Users,
+  CalendarCheck,
+  ShieldCheck,
+  MessageCircle,
+  ClipboardList,
+  BellRing,
 } from "lucide-react";
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 export default function Landing() {
   const navigate = useNavigate();
 
-  const [dashboard, setDashboard] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    loadDashboard();
-  }, []);
-
-  async function loadDashboard() {
-    try {
-      const res = await fetch(`${API_BASE_URL}/attendance/dashboard-stats`);
-
-      if (!res.ok) {
-        throw new Error("Failed to load");
-      }
-
-      const data = await res.json();
-      setDashboard(data);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  const trend = dashboard?.monthly_trend || [];
+  const features = [
+    {
+      icon: <Users size={22} />,
+      title: "Student Records",
+      desc: "Manage student details, class information, and parent contact records easily.",
+    },
+    {
+      icon: <CalendarCheck size={22} />,
+      title: "Attendance Management",
+      desc: "Teachers can mark and maintain attendance records in a simple workflow.",
+    },
+    {
+      icon: <MessageCircle size={22} />,
+      title: "Parent Communication",
+      desc: "Send important updates and attendance alerts to parents when needed.",
+    },
+    {
+      icon: <ClipboardList size={22} />,
+      title: "Organized Data",
+      desc: "Keep school records clean, structured, and easy to access.",
+    },
+    {
+      icon: <BellRing size={22} />,
+      title: "Notifications",
+      desc: "Notify parents and staff about absentees, announcements, and updates.",
+    },
+    {
+      icon: <ShieldCheck size={22} />,
+      title: "Secure Access",
+      desc: "Role-based access for admins and teachers to protect school data.",
+    },
+  ];
 
   return (
-    <div className="min-h-screen overflow-hidden bg-[#f4f7fb] text-gray-900">
-      {/* Background */}
-      <div className="absolute left-[-120px] top-[-120px] h-[320px] w-[320px] rounded-full bg-indigo-200/40 blur-3xl" />
-      <div className="absolute bottom-[-140px] right-[-100px] h-[320px] w-[320px] rounded-full bg-cyan-200/40 blur-3xl" />
-
-      <div className="relative z-10 mx-auto max-w-7xl px-6 py-8">
+    <div className="min-h-screen bg-[#f8faf7] text-slate-900">
+      <div className="mx-auto max-w-7xl px-6 py-6">
         {/* Navbar */}
-        <nav className="mb-16 flex items-center justify-between rounded-2xl border border-white/40 bg-white/70 px-6 py-4 shadow-lg backdrop-blur-xl">
+        <nav className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-6 py-4 shadow-sm">
           <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-600 text-white">
-              <GraduationCap size={22} />
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-600 text-white">
+              <GraduationCap size={23} />
             </div>
 
             <div>
-              <h1 className="text-lg font-bold">Handler</h1>
-              <p className="text-xs text-gray-500">
+              <h1 className="text-xl font-bold tracking-tight">Handler</h1>
+              <p className="text-xs text-slate-500">
                 Student Management System
               </p>
             </div>
           </div>
 
+          <div className="hidden items-center gap-8 text-sm font-medium text-slate-600 md:flex">
+            <a href="#features" className="hover:text-emerald-700">
+              Features
+            </a>
+            <a href="#workflow" className="hover:text-emerald-700">
+              Workflow
+            </a>
+            <a href="#contact" className="hover:text-emerald-700">
+              Contact
+            </a>
+          </div>
+
           <button
             onClick={() => navigate("/login")}
-            className="rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700"
+            className="rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700"
           >
             Login
           </button>
         </nav>
 
         {/* Hero */}
-        <section className="grid items-center gap-14 lg:grid-cols-2">
-          {/* Left */}
+        <section className="grid items-center gap-12 py-20 lg:grid-cols-2">
           <div>
-            <div className="mb-5 inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-medium text-indigo-700 shadow">
+            <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700">
               <CheckCircle2 size={16} />
-              Real-time School Analytics
+              Simple school management platform
             </div>
 
-            <h1 className="max-w-xl text-5xl font-black leading-tight md:text-6xl">
-              Smart Student
-              <span className="block bg-gradient-to-r from-indigo-600 to-cyan-500 bg-clip-text text-transparent">
-                Management Platform
-              </span>
-            </h1>
+            <h2 className="max-w-2xl text-4xl font-bold leading-tight tracking-tight text-slate-950 md:text-5xl">
+              Manage students, attendance, and parent communication in one
+              system.
+            </h2>
 
-            <p className="mt-6 max-w-xl text-lg leading-8 text-gray-600">
-              Manage attendance, student records, and analytics from one
-              professional dashboard built for modern schools.
+            <p className="mt-5 max-w-xl text-base leading-7 text-slate-600 md:text-lg">
+              Handler helps schools maintain student records, track attendance,
+              and communicate with parents using a clean and easy-to-use
+              platform.
             </p>
 
             <div className="mt-8 flex flex-wrap items-center gap-4">
               <button
                 onClick={() => navigate("/login")}
-                className="flex items-center gap-2 rounded-2xl bg-indigo-600 px-7 py-4 text-sm font-semibold text-white shadow-xl shadow-indigo-200 hover:bg-indigo-700"
+                className="flex items-center gap-2 rounded-xl bg-emerald-600 px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700"
               >
                 Access Dashboard
-                <ArrowRight size={18} />
+                <ArrowRight size={17} />
               </button>
 
-              <div className="flex items-center gap-2 text-sm text-gray-500">
-                <CheckCircle2 size={18} className="text-green-500" />
-                Live backend data
-              </div>
+              <button
+                onClick={() => {
+                  const section = document.getElementById("features");
+                  section?.scrollIntoView({ behavior: "smooth" });
+                }}
+                className="rounded-xl border border-slate-300 bg-white px-6 py-3 text-sm font-semibold text-slate-700 transition hover:border-emerald-500 hover:text-emerald-700"
+              >
+                View Features
+              </button>
             </div>
 
-            {/* Real Stats */}
-            <div className="mt-12 grid grid-cols-1 gap-4 sm:grid-cols-3">
-              <div className="rounded-2xl bg-white p-5 shadow-lg">
-                <p className="text-sm text-gray-500">
-                  Total Students
-                </p>
-
-                <h3 className="mt-2 text-3xl font-bold text-indigo-600">
-                  {loading
-                    ? "..."
-                    : dashboard?.total_enrollment || 0}
-                </h3>
-              </div>
-
-              <div className="rounded-2xl bg-white p-5 shadow-lg">
-                <p className="text-sm text-gray-500">
-                  Average Attendance
-                </p>
-
-                <h3 className="mt-2 text-3xl font-bold text-cyan-600">
-                  {loading
-                    ? "..."
-                    : `${dashboard?.avg_attendance || 0}%`}
-                </h3>
-              </div>
-
-              <div className="rounded-2xl bg-white p-5 shadow-lg">
-                <p className="text-sm text-gray-500">
-                  Today's Present
-                </p>
-
-                <h3 className="mt-2 text-3xl font-bold text-green-600">
-                  {loading
-                    ? "..."
-                    : dashboard?.today?.present || 0}
-                </h3>
-              </div>
+            <div className="mt-8 grid max-w-xl gap-3 sm:grid-cols-3">
+              {["Easy to use", "Secure login", "School focused"].map((item) => (
+                <div
+                  key={item}
+                  className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-600"
+                >
+                  <CheckCircle2 size={17} className="text-emerald-600" />
+                  {item}
+                </div>
+              ))}
             </div>
           </div>
 
-          {/* Right Analytics */}
-          <div className="rounded-[32px] bg-white p-6 shadow-2xl">
-            <div className="mb-6 flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-semibold">
-                  Attendance Overview
-                </h3>
-
-                <p className="text-sm text-gray-500">
-                  Real monthly attendance trend
-                </p>
-              </div>
-
-              <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-700">
-                Live
-              </span>
+          {/* Right Card */}
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="mb-6">
+              <p className="text-sm font-semibold text-emerald-700">
+                Dashboard Preview
+              </p>
+              <h3 className="mt-2 text-2xl font-bold text-slate-950">
+                School Operations Made Simple
+              </h3>
+              <p className="mt-2 text-sm leading-6 text-slate-500">
+                A clean dashboard experience for admins and teachers to manage
+                everyday school activities.
+              </p>
             </div>
 
-            {/* Today's Attendance */}
-            <div className="mb-6 grid grid-cols-2 gap-4">
-              <div className="rounded-2xl bg-indigo-50 p-5">
-                <p className="text-sm text-gray-500">
-                  Present
-                </p>
-
-                <h2 className="mt-2 text-3xl font-bold text-indigo-600">
-                  {dashboard?.today?.present || 0}
-                </h2>
-              </div>
-
-              <div className="rounded-2xl bg-red-50 p-5">
-                <p className="text-sm text-gray-500">
-                  Absent
-                </p>
-
-                <h2 className="mt-2 text-3xl font-bold text-red-500">
-                  {dashboard?.today?.absent || 0}
-                </h2>
-              </div>
-            </div>
-
-            {/* Real Chart */}
-            <div className="rounded-2xl bg-gray-50 p-5">
-              <div className="mb-5 flex items-center justify-between">
-                <p className="text-sm font-medium text-gray-600">
-                  Monthly Attendance %
-                </p>
-
-                <span className="text-xs text-gray-400">
-                  Last 10 Months
-                </span>
-              </div>
-
-              <div className="flex h-56 items-end justify-between gap-3">
-                {trend.map((item) => (
-                  <div
-                    key={item.month}
-                    className="flex flex-1 flex-col items-center gap-2"
-                  >
-                    <div
-                      className="w-full rounded-t-2xl bg-gradient-to-t from-indigo-600 to-cyan-400"
-                      style={{
-                        height: `${Math.max(
-                          item.percentage * 1.8,
-                          10
-                        )}px`,
-                      }}
-                    />
-
-                    <span className="text-xs text-gray-500">
-                      {item.month}
-                    </span>
-
-                    <span className="text-[10px] font-medium text-gray-400">
-                      {item.percentage}%
-                    </span>
+            <div className="space-y-4">
+              <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-5">
+                <div className="flex items-start gap-4">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-emerald-600 text-white">
+                    <CalendarCheck size={22} />
                   </div>
-                ))}
+
+                  <div>
+                    <h4 className="font-semibold text-slate-950">
+                      Attendance Tracking
+                    </h4>
+                    <p className="mt-1 text-sm leading-6 text-slate-600">
+                      Mark daily attendance and maintain records efficiently.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-amber-100 bg-amber-50 p-5">
+                <div className="flex items-start gap-4">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-amber-500 text-white">
+                    <MessageCircle size={22} />
+                  </div>
+
+                  <div>
+                    <h4 className="font-semibold text-slate-950">
+                      Parent Updates
+                    </h4>
+                    <p className="mt-1 text-sm leading-6 text-slate-600">
+                      Keep parents informed about attendance and school updates.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
+                <div className="flex items-start gap-4">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-slate-800 text-white">
+                    <ShieldCheck size={22} />
+                  </div>
+
+                  <div>
+                    <h4 className="font-semibold text-slate-950">
+                      Secure Management
+                    </h4>
+                    <p className="mt-1 text-sm leading-6 text-slate-600">
+                      Protect data with separate access for admins and teachers.
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
         </section>
 
         {/* Features */}
-        <section className="mt-28">
-          <div className="mb-12 text-center">
-            <h2 className="text-4xl font-bold">
-              Core Features
+        <section id="features" className="py-14">
+          <div className="mb-10 max-w-2xl">
+            <p className="text-sm font-semibold uppercase tracking-wide text-emerald-700">
+              Features
+            </p>
+
+            <h2 className="mt-3 text-3xl font-bold tracking-tight text-slate-950 md:text-4xl">
+              Essential tools for school management
             </h2>
 
-            <p className="mx-auto mt-4 max-w-2xl text-gray-500">
-              Everything required for complete student and attendance management.
+            <p className="mt-4 text-base leading-7 text-slate-600">
+              Handler focuses on the important parts of school administration
+              without making the system complicated.
             </p>
           </div>
 
-          <div className="grid gap-6 md:grid-cols-3">
-            {[
-              {
-                icon: <Users size={24} />,
-                title: "Student Records",
-                desc: "Maintain complete student information securely.",
-              },
-              {
-                icon: <Activity size={24} />,
-                title: "Attendance Tracking",
-                desc: "Monitor daily attendance with realtime updates.",
-              },
-              {
-                icon: <BarChart3 size={24} />,
-                title: "Analytics Dashboard",
-                desc: "Visualize attendance and performance insights.",
-              },
-            ].map((item) => (
+          <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+            {features.map((item) => (
               <div
                 key={item.title}
-                className="rounded-3xl bg-white p-7 shadow-lg transition hover:-translate-y-1 hover:shadow-2xl"
+                className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:border-emerald-200 hover:shadow-md"
               >
-                <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-100 text-indigo-600">
+                <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
                   {item.icon}
                 </div>
 
-                <h3 className="mb-3 text-lg font-semibold">
+                <h3 className="text-lg font-semibold text-slate-950">
                   {item.title}
                 </h3>
 
-                <p className="text-sm leading-7 text-gray-500">
+                <p className="mt-2 text-sm leading-6 text-slate-500">
                   {item.desc}
                 </p>
               </div>
@@ -279,8 +246,80 @@ export default function Landing() {
           </div>
         </section>
 
+        {/* Workflow */}
+        <section id="workflow" className="py-14">
+          <div className="rounded-2xl bg-slate-900 p-8 text-white md:p-10">
+            <div className="grid gap-10 lg:grid-cols-2 lg:items-center">
+              <div>
+                <p className="text-sm font-semibold uppercase tracking-wide text-emerald-300">
+                  Workflow
+                </p>
+
+                <h2 className="mt-3 text-3xl font-bold tracking-tight md:text-4xl">
+                  Designed for daily school operations
+                </h2>
+
+                <p className="mt-4 text-base leading-7 text-slate-300">
+                  Teachers mark attendance, admins manage records, and parents
+                  receive important updates when required.
+                </p>
+
+                <button
+                  onClick={() => navigate("/login")}
+                  className="mt-7 flex items-center gap-2 rounded-xl bg-emerald-500 px-6 py-3 text-sm font-semibold text-white transition hover:bg-emerald-600"
+                >
+                  Login to Continue
+                  <ArrowRight size={17} />
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                {[
+                  "Teacher marks attendance",
+                  "System stores the records",
+                  "Admin manages student details",
+                  "Parents receive updates",
+                ].map((step, index) => (
+                  <div
+                    key={step}
+                    className="flex items-center gap-4 rounded-xl border border-white/10 bg-white/5 p-4"
+                  >
+                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-500 text-sm font-bold text-white">
+                      {index + 1}
+                    </div>
+
+                    <p className="text-sm font-medium text-slate-100">{step}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* CTA */}
+        <section id="contact" className="py-14">
+          <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm md:p-10">
+            <h2 className="text-3xl font-bold tracking-tight text-slate-950 md:text-4xl">
+              Start managing your school more efficiently
+            </h2>
+
+            <p className="mx-auto mt-4 max-w-2xl text-base leading-7 text-slate-600">
+              Login to access your dashboard and manage students, attendance,
+              and communication from one place.
+            </p>
+
+            <button
+              onClick={() => navigate("/login")}
+              className="mt-7 inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-7 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700"
+            >
+              Access Dashboard
+              <ArrowRight size={17} />
+            </button>
+          </div>
+        </section>
+
         {/* Footer */}
-        <footer className="mt-20 flex flex-col items-center justify-between gap-4 border-t border-gray-200 py-8 text-sm text-gray-500 md:flex-row">
+        <footer className="flex flex-col items-center justify-between gap-4 border-t border-slate-200 py-8 text-sm text-slate-500 md:flex-row">
           <p>© 2026 Handler. All rights reserved.</p>
 
           <div className="flex gap-6">

@@ -9,13 +9,16 @@ from fastapi import (
     WebSocket,
     WebSocketDisconnect,
 )
+
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from core.dependencies import get_current_user
 from database import get_db
+
 from models.attendence import Attendance
 from models.student import Student
+
 from schemas.attendence import (
     AttendanceBulkSave,
     DailyAttendanceResponse,
@@ -24,17 +27,39 @@ from schemas.attendence import (
     StudentAttendanceStatus,
 )
 
-router = APIRouter(prefix="/attendance", tags=["Attendance"])
+
+router = APIRouter(
+    prefix="/attendance",
+    tags=["Attendance"],
+)
+
 
 MONTH_LABELS = [
-    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
 ]
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+VALID_STATUSES = {
+    "present",
+    "absent",
+    "leave",
+}
+
+
+# ─────────────────────────────────────────────
 # WebSocket Manager
-# ─────────────────────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────
 
 class ConnectionManager:
     def __init__(self):
@@ -69,9 +94,10 @@ class ConnectionManager:
 manager = ConnectionManager()
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────
 # WebSocket Endpoint
-# ─────────────────────────────────────────────────────────────────────────────
+# URL: /attendance/ws
+# ─────────────────────────────────────────────
 
 @router.websocket("/ws")
 async def attendance_websocket(websocket: WebSocket):
@@ -81,7 +107,6 @@ async def attendance_websocket(websocket: WebSocket):
         while True:
             message = await websocket.receive_text()
 
-            # optional ping-pong
             if message == "ping":
                 await websocket.send_text("pong")
 
@@ -92,9 +117,10 @@ async def attendance_websocket(websocket: WebSocket):
         manager.disconnect(websocket)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Get Daily Attendance
-# ─────────────────────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────
+# Get Daily Student Attendance
+# URL: /attendance/daily?date=YYYY-MM-DD
+# ─────────────────────────────────────────────
 
 @router.get("/daily", response_model=DailyAttendanceResponse)
 def get_daily_attendance(
@@ -142,13 +168,18 @@ def get_daily_attendance(
     records = []
 
     for student in students:
+        status = attendance_map.get(student.id, "absent")
+
+        if status not in VALID_STATUSES:
+            status = "absent"
+
         records.append(
             StudentAttendanceStatus(
                 student_id=student.id,
                 name=student.name,
                 father_name=student.father_name,
                 standard=student.standard,
-                status=attendance_map.get(student.id, "absent"),
+                status=status,
             )
         )
 
@@ -157,18 +188,30 @@ def get_daily_attendance(
         if record.status == "present"
     )
 
+    absent_count = sum(
+        1 for record in records
+        if record.status == "absent"
+    )
+
+    leave_count = sum(
+        1 for record in records
+        if record.status == "leave"
+    )
+
     return DailyAttendanceResponse(
         date=target_date,
         records=records,
         total=len(records),
         present=present_count,
-        absent=len(records) - present_count,
+        absent=absent_count,
+        leave=leave_count,
     )
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Save Attendance
-# ─────────────────────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────
+# Save Student Attendance
+# URL: /attendance/save
+# ─────────────────────────────────────────────
 
 @router.post("/save")
 async def save_attendance(
@@ -178,6 +221,23 @@ async def save_attendance(
 ):
     try:
         for record in payload.records:
+            student = (
+                db.query(Student)
+                .filter(Student.id == record.student_id)
+                .first()
+            )
+
+            if not student:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Student not found: {record.student_id}",
+                )
+
+            if record.status not in VALID_STATUSES:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid status: {record.status}",
+                )
 
             existing = (
                 db.query(Attendance)
@@ -206,8 +266,16 @@ async def save_attendance(
             "event": "attendance_saved",
             "date": str(payload.date),
             "present": sum(
-                1 for r in payload.records
-                if r.status == "present"
+                1 for record in payload.records
+                if record.status == "present"
+            ),
+            "absent": sum(
+                1 for record in payload.records
+                if record.status == "absent"
+            ),
+            "leave": sum(
+                1 for record in payload.records
+                if record.status == "leave"
             ),
         })
 
@@ -215,6 +283,10 @@ async def save_attendance(
             "message": "Attendance saved successfully",
             "date": str(payload.date),
         }
+
+    except HTTPException:
+        db.rollback()
+        raise
 
     except Exception as e:
         db.rollback()
@@ -225,9 +297,10 @@ async def save_attendance(
         )
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────
 # Student Attendance Analysis
-# ─────────────────────────────────────────────────────────────────────────────
+# URL: /attendance/analysis/{student_id}
+# ─────────────────────────────────────────────
 
 @router.get(
     "/analysis/{student_id}",
@@ -265,7 +338,10 @@ def get_student_analysis(
     )
 
     for record in records:
-        key = (record.date.year, record.date.month)
+        key = (
+            record.date.year,
+            record.date.month,
+        )
 
         month_data[key]["total"] += 1
 
@@ -275,7 +351,6 @@ def get_student_analysis(
     monthly_breakdown = []
 
     for (year, month), data in sorted(month_data.items()):
-
         percentage = (
             round(
                 (data["present"] / data["total"]) * 100,
@@ -300,8 +375,21 @@ def get_student_analysis(
         if record.status == "present"
     )
 
+    absent_days = sum(
+        1 for record in records
+        if record.status == "absent"
+    )
+
+    leave_days = sum(
+        1 for record in records
+        if record.status == "leave"
+    )
+
     overall_percentage = (
-        round((present_days / total_days) * 100, 1)
+        round(
+            (present_days / total_days) * 100,
+            1,
+        )
         if total_days
         else 0.0
     )
@@ -333,7 +421,8 @@ def get_student_analysis(
         school_name=student.school_name,
         total_session_days=total_days,
         days_present=present_days,
-        days_absent=total_days - present_days,
+        days_absent=absent_days,
+        days_leave=leave_days,
         overall_percentage=overall_percentage,
         highest_month=(
             f"{highest_month['month']} "
@@ -351,9 +440,10 @@ def get_student_analysis(
     )
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────
 # Dashboard Attendance Stats
-# ─────────────────────────────────────────────────────────────────────────────
+# URL: /attendance/dashboard-stats
+# ─────────────────────────────────────────────
 
 @router.get(
     "/dashboard-stats",
@@ -378,17 +468,28 @@ def get_dashboard_attendance_stats(
         if record.status == "present"
     )
 
+    today_leave = sum(
+        1 for record in today_records
+        if record.status == "leave"
+    )
+
+    today_absent = total_students - today_present - today_leave
+
+    if today_absent < 0:
+        today_absent = 0
+
     today_percentage = (
-        round((today_present / total_students) * 100, 1)
+        round(
+            (today_present / total_students) * 100,
+            1,
+        )
         if total_students
         else 0.0
     )
 
-    # Monthly Trend
     monthly_trend = []
 
     for i in range(9, -1, -1):
-
         ref_date = (
             today.replace(day=1)
             - timedelta(days=i * 30)
@@ -421,7 +522,6 @@ def get_dashboard_attendance_stats(
         )
 
         for record in month_records:
-
             days_map[record.date]["total"] += 1
 
             if record.status == "present":
@@ -448,7 +548,6 @@ def get_dashboard_attendance_stats(
             "percentage": average,
         })
 
-    # Overall Average Attendance
     all_records = db.query(Attendance).all()
 
     overall_days_map = defaultdict(
@@ -459,7 +558,6 @@ def get_dashboard_attendance_stats(
     )
 
     for record in all_records:
-
         overall_days_map[record.date]["total"] += 1
 
         if record.status == "present":
@@ -486,7 +584,8 @@ def get_dashboard_attendance_stats(
             "date": today,
             "total": total_students,
             "present": today_present,
-            "absent": total_students - today_present,
+            "absent": today_absent,
+            "leave": today_leave,
             "percentage": today_percentage,
         },
         monthly_trend=monthly_trend,

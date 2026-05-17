@@ -7,6 +7,7 @@ import Landing from "../pages/Landing";
 import Login from "../pages/Login";
 import Dashboard from "../pages/Dashboard";
 import Students from "../pages/Students";
+import Teachers from "../pages/Teachers";
 import Attendance from "../pages/Attendance";
 
 import ProtectedLayout from "../layouts/ProtectedLayout";
@@ -36,10 +37,17 @@ const router = createBrowserRouter([
         path: "dashboard",
         element: <Dashboard />,
       },
+
       {
         path: "students",
         element: <Students />,
       },
+
+      {
+        path: "teachers",
+        element: <Teachers />,
+      },
+
       {
         path: "attendance",
         element: <Attendance />,

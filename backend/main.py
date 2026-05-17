@@ -4,16 +4,23 @@ from fastapi.middleware.cors import CORSMiddleware
 from config import settings
 from core.security import hash_password
 from database import Base, SessionLocal, engine
+
+# Import all models before create_all
 from models.user import User
-from models.student import Student       
-from models.attendence import Attendance  
-from routers import auth, student, dashboard, attendence
+from models.student import Student
+from models.attendence import Attendance
+from models.teacher import Teacher
+from models.teacher_attendance import TeacherAttendance
+
+from routers import auth, student, dashboard, attendence, teacher
 
 
 def seed_default_admin():
     db = SessionLocal()
+
     try:
         user = db.query(User).filter(User.email == settings.admin_email).first()
+
         if user:
             return
 
@@ -23,22 +30,18 @@ def seed_default_admin():
             hashed_password=hash_password(settings.admin_password),
             is_active=True,
         )
+
         db.add(db_user)
         db.commit()
+
     except Exception as e:
         print("Seed error:", e)
+
     finally:
         db.close()
 
 
 app = FastAPI(title="Student Management API")
-
-
-@app.on_event("startup")
-def startup():
-    print("App starting...")
-    Base.metadata.create_all(bind=engine)   # creates all tables
-    seed_default_admin()
 
 
 app.add_middleware(
@@ -55,12 +58,25 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+@app.on_event("startup")
+def startup():
+    print("App starting...")
+
+    Base.metadata.create_all(bind=engine)
+
+    seed_default_admin()
+
+
 app.include_router(auth.router)
 app.include_router(student.router)
 app.include_router(dashboard.router)
 app.include_router(attendence.router)
+app.include_router(teacher.router)
 
 
 @app.get("/")
 def root():
-    return {"message": "Student Management API running"}
+    return {
+        "message": "Student Management API running",
+    }
